@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+  <style>
+    body {
+      background: #ffd6e6;
+      margin: 0;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <script>
+    const canvas = document.getElementById('canvas');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const ctx = canvas.getContext('2d');
+
+    // Load your background image
+    const backgroundImage = new Image();
+    backgroundImage.src = "image4.jpg"; // Replace with your image URL
+
+    // Function to draw the background heart with the image inside (clipped, translucent, with offset) and an outline
+    function drawBackgroundHeart() {
+      // Center of canvas
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      
+      // Parameters for image offset (adjust as needed)
+      const offsetX = 170; // positive value shifts right, negative left
+      const offsetY = -50; // positive value shifts down, negative up
+
+      // Save context state
+      ctx.save();
+      ctx.globalAlpha = 0.9; // set translucency for the background heart
+      
+      // Move to the center
+      ctx.translate(centerX, centerY);
+      
+      // Create heart shape path
+      ctx.beginPath();
+      const scale = 25; // adjust scale as needed
+      for (let t = 0; t <= Math.PI * 2; t += 0.01) {
+        const x = 16 * Math.pow(Math.sin(t), 3);
+        const y = -13 * Math.cos(t) + 5 * Math.cos(2 * t) + 2 * Math.cos(3 * t) + Math.cos(4 * t);
+        if (t === 0) {
+          ctx.moveTo(x * scale, y * scale);
+        } else {
+          ctx.lineTo(x * scale, y * scale);
+        }
+      }
+      ctx.closePath();
+      
+      // Clip to the heart shape
+      ctx.clip();
+      
+      // Draw the image inside the clipped heart with the specified offset
+      if (backgroundImage.complete) {
+        ctx.drawImage(backgroundImage, -canvas.width / 2 + offsetX, -canvas.height / 2 + offsetY, canvas.width, canvas.height);
+      }
+      ctx.restore();
+
+      // Draw the heart outline
+      ctx.save();
+      // Move to the center
+      ctx.translate(centerX, centerY);
+      ctx.beginPath();
+      for (let t = 0; t <= Math.PI * 2; t += 0.01) {
+        const x = 16 * Math.pow(Math.sin(t), 3);
+        const y = -13 * Math.cos(t) + 5 * Math.cos(2 * t) + 2 * Math.cos(3 * t) + Math.cos(4 * t);
+        if (t === 0) {
+          ctx.moveTo(x * scale, y * scale);
+        } else {
+          ctx.lineTo(x * scale, y * scale);
+        }
+      }
+      ctx.closePath();
+      ctx.lineWidth = 5;             // outline thickness
+      ctx.strokeStyle = '#e33261';     // outline color
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Interactive Letter class
+    class Letter {
+      constructor(char, x, y) {
+        this.char = char;
+        this.x = x;
+        this.y = y;
+        this.dx = 0;
+        this.dy = 0;
+        this.fontSize = 40;
+        this.radius = this.fontSize / 2;
+        this.color = '#ff4d6d';
+        this.velocityDecay = 0.99;
+      }
+
+      update(letters, heart) {
+        // Add slight random movement
+        this.dx += (Math.random() - 0.5) * 0.1;
+        this.dy += (Math.random() - 0.5) * 0.1;
+        this.dx *= this.velocityDecay;
+        this.dy *= this.velocityDecay;
+
+        // Collision with the interactive heart
+        const dx = heart.x - this.x;
+        const dy = heart.y - this.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < this.radius + heart.radius) {
+          const angle = Math.atan2(dy, dx);
+          const overlap = (this.radius + heart.radius - distance);
+          this.x -= overlap * Math.cos(angle);
+          this.y -= overlap * Math.sin(angle);
+        }
+
+        // Letter-letter collisions
+        letters.forEach(other => {
+          if (other === this) return;
+          const dx = other.x - this.x;
+          const dy = other.y - this.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance < this.radius + other.radius) {
+            const angle = Math.atan2(dy, dx);
+            const overlap = (this.radius + other.radius - distance) / 2;
+            this.x -= overlap * Math.cos(angle);
+            this.y -= overlap * Math.sin(angle);
+            other.x += overlap * Math.cos(angle);
+            other.y += overlap * Math.sin(angle);
+          }
+        });
+
+        this.x += this.dx;
+        this.y += this.dy;
+      }
+
+      draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.font = `${this.fontSize}px 'Pacifico', cursive`;
+        ctx.fillStyle = this.color;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.char, 0, 0);
+        ctx.restore();
+      }
+    }
+
+    // Interactive Heart class
+    class Heart {
+      constructor() {
+        this.radius = 90; // interactive heart size
+        this.x = canvas.width / 2;
+        this.y = canvas.height / 2;
+        this.color = '#ff4d6d';
+        this.dx = (Math.random() - 0.5) * 4;
+        this.dy = (Math.random() - 0.5) * 4;
+        this.velocityDecay = 0.99;
+      }
+
+      update() {
+        this.dx += (Math.random() - 0.5) * 0.1;
+        this.dy += (Math.random() - 0.5) * 0.1;
+        this.dx *= this.velocityDecay;
+        this.dy *= this.velocityDecay;
+
+        this.x += this.dx;
+        this.y += this.dy;
+
+        // Bounce off the canvas edges
+        if (this.x - this.radius < 0 || this.x + this.radius > canvas.width) {
+          this.dx *= -1;
+        }
+        if (this.y - this.radius < 0 || this.y + this.radius > canvas.height) {
+          this.dy *= -1;
+        }
+      }
+
+      draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.beginPath();
+        for (let t = 0; t <= Math.PI * 2; t += 0.01) {
+          const x = 16 * Math.pow(Math.sin(t), 3);
+          const y = -13 * Math.cos(t) + 5 * Math.cos(2 * t) + 2 * Math.cos(3 * t) + Math.cos(4 * t);
+          ctx.lineTo(x * 6, y * 6);
+        }
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.restore();
+
+        // Draw text inside the interactive heart
+        ctx.save();
+        ctx.fillStyle = 'white';
+        ctx.font = '25px Pacifico, cursive';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('I Love You ❤️', this.x, this.y);
+        ctx.restore();
+      }
+    }
+
+    // Set up the letters and interactive heart
+    const text = "Happy Valentines Day Baby";
+    const letters = [];
+    const heart = new Heart();
+
+    // Position the letters below the interactive heart
+    const startX = canvas.width / 2 - (text.replace(/ /g, '').length * 25);
+    const startY = canvas.height / 2 + 120;
+    let charIndex = 0;
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === ' ') continue;
+      letters.push(new Letter(text[i], startX + (charIndex * 50), startY));
+      charIndex++;
+    }
+
+    // Main animation loop
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw the separate background heart with the clipped image, outline, and image offset
+      drawBackgroundHeart();
+
+      // Update and draw the interactive heart and letters
+      heart.update();
+      heart.draw();
+
+      letters.forEach(letter => {
+        letter.update(letters, heart);
+        letter.draw();
+      });
+
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      heart.x = canvas.width / 2;
+      heart.y = canvas.height / 2;
+    });
+  </script>
+</body>
+</html>
